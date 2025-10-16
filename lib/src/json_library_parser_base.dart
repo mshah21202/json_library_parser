@@ -17,14 +17,14 @@ class PackageApiAnalyzer {
   /// for packages in `.pub-cache` or read-only locations. Defaults to false.
   ///
   /// Returns a Map containing the JSON representation of the package's public API.
-  /// The structure is:
-  /// ```json
-  /// {
-  ///   "lib/some_library.dart": {
-  ///     "classes": [...]
-  ///   }
-  /// }
-  /// ```
+  /// The structure includes:
+  /// - Classes with members, inheritance, and type parameters
+  /// - Enums with their values and members
+  /// - Top-level functions with parameters and return types
+  /// - Top-level variables with their types and modifiers
+  ///
+  /// Each element includes metadata about where it can be imported from
+  /// (`importableFrom`) and where it's defined (`definedIn`).
   ///
   /// Throws [ArgumentError] if the package path is invalid or doesn't contain
   /// a pubspec.yaml file.
@@ -78,32 +78,90 @@ class PackageApiAnalyzer {
         return result; // No lib directory, return empty result
       }
 
-      // Get all top-level Dart files that export the public API, make sure to replace the temp path if used
-      final exportingFiles = (await _getTopLevelExportingFiles(libDir, collection)).map((file) {
-        if (tempDir != null) {
-          return file.replaceFirst(tempDir.path, analysisPath);
-        }
-        return file;
-      }).toList();
+      // Read pubspec.yaml to get package name
+      final pubspecContent = await pubspecFile.readAsString();
+      final packageName = _extractPackageName(pubspecContent);
 
-      for (final file in exportingFiles) {
-        result[file] = {'classes': [], 'functions': []};
+      // Find all public library files (exclude lib/src/** at any level)
+      final publicLibraryFiles = await _findPublicLibraries(libDir);
+
+      if (publicLibraryFiles.isEmpty) {
+        return result; // No public libraries found
       }
 
-      // Analyze each exporting file
-      for (final filePath in exportingFiles) {
-        final context = collection.contextFor(filePath);
+      // Map to track which elements are exported by which package URIs
+      // Key: Element object, Value: Set of package URIs that export this element
+      final elementToUris = <Element, Set<String>>{};
+
+      // Process each public library
+      for (final libraryFile in publicLibraryFiles) {
+        final context = collection.contextFor(libraryFile.path);
         final session = context.currentSession;
-        final resolvedResult = await session.getResolvedLibrary(filePath);
-        if (resolvedResult is! ResolvedLibraryResult) {
-          print('Warning: Could not resolve library for $filePath');
+        final libraryResult = await session.getResolvedLibrary(libraryFile.path);
+
+        if (libraryResult is! ResolvedLibraryResult) {
+          print('Warning: Failed to resolve library: ${libraryFile.path}');
           continue;
         }
 
-        final library = resolvedResult.element;
-        final libraryApi = _extractLibraryApi(library);
-        result[filePath] = libraryApi;
+        final libraryElement = libraryResult.element;
+        final exportNamespace = libraryElement.exportNamespace;
+
+        // Construct package URI for this library
+        final relativePath = p.relative(libraryFile.path, from: libDir.path);
+        final packageUri = 'package:$packageName/$relativePath';
+
+        // Iterate through all elements in the export namespace
+        for (final entry in exportNamespace.definedNames2.entries) {
+          final elementName = entry.key;
+          final element = entry.value;
+
+          // Skip private elements
+          if (elementName.startsWith('_')) {
+            continue;
+          }
+
+          // Track which package URIs export this element
+          elementToUris.putIfAbsent(element, () => <String>{}).add(packageUri);
+        }
       }
+
+      // Build the final result structure
+      // Group elements and add importableFrom/definedIn metadata
+      final elementsData = <Map<String, dynamic>>[];
+
+      for (final entry in elementToUris.entries) {
+        final element = entry.key;
+        final importableFromUris = entry.value.toList()..sort();
+
+        Map<String, dynamic>? elementData;
+
+        if (element is ClassElement) {
+          elementData = _extractClassApi(element);
+          elementData['elementType'] = 'class';
+        } else if (element is EnumElement) {
+          elementData = _extractEnumApi(element);
+          elementData['elementType'] = 'enum';
+        } else if (element is TopLevelVariableElement) {
+          elementData = _extractTopLevelVariableApi(element);
+          elementData['elementType'] = 'variable';
+        } else if (element is TopLevelFunctionElement) {
+          elementData = _extractFunctionApi(element);
+          elementData['elementType'] = 'function';
+        } else if (element is PropertyAccessorElement) {
+          // Top-level getters/setters for variables are handled via TopLevelVariableElement
+          // Skip them here to avoid duplication
+          continue;
+        }
+
+        if (elementData != null) {
+          elementData['importableFrom'] = importableFromUris;
+          elementData['definedIn'] = element.library?.uri.toString() ?? 'unknown';
+          elementsData.add(elementData);
+        }
+      }
+
+      result['elements'] = elementsData;
 
       return result;
     } catch (e) {
@@ -116,34 +174,13 @@ class PackageApiAnalyzer {
     }
   }
 
-  /// Returns a list of top-level Dart files that export the public API. This means
-  /// they are in the 'lib' directory and include export directives.
-  Future<List<String>> _getTopLevelExportingFiles(Directory libDir, AnalysisContextCollection collection) async {
-    final exportingFiles = <String>[];
-
-    await for (final entity in libDir.list(recursive: false, followLinks: false)) {
-      if (entity is File && entity.path.endsWith('.dart') && !p.basename(entity.path).startsWith("_")) {
-        final context = collection.contextFor(entity.path);
-        final session = context.currentSession;
-        final result = await session.getResolvedLibrary(entity.path);
-
-        if (result is ResolvedLibraryResult) {
-          final libraryElement = result.element;
-
-          // Check if the library has any export directives
-          if (_isExportingLibrary(libraryElement)) {
-            exportingFiles.add(entity.path);
-          }
-        }
-      }
+  String _extractPackageName(String pubspecContent) {
+    final nameRegex = RegExp(r'^name:\s*(.+)$', multiLine: true);
+    final match = nameRegex.firstMatch(pubspecContent);
+    if (match == null) {
+      throw ArgumentError('Package name not found in pubspec.yaml');
     }
-
-    return exportingFiles;
-  }
-
-  bool _isExportingLibrary(LibraryElement library) {
-    // A library is considered exporting if it has any export directives
-    return library.exportedLibraries.isNotEmpty;
+    return match.group(1)!.trim();
   }
 
   /// Copies a directory recursively.
@@ -164,6 +201,41 @@ class PackageApiAnalyzer {
         await entity.copy(p.join(destination.path, name));
       }
     }
+  }
+
+  /// Finds all public library files in the lib directory.
+  ///
+  /// A library is considered public if its path does not contain 'src' as a
+  /// directory component at any level. This properly excludes files in lib/src/,
+  /// lib/foo/src/, etc.
+  Future<List<File>> _findPublicLibraries(Directory libDir) async {
+    final publicLibraries = <File>[];
+
+    await for (final entity in libDir.list(recursive: true)) {
+      if (entity is File && entity.path.endsWith('.dart')) {
+        // Get the relative path from lib directory
+        final relativePath = p.relative(entity.path, from: libDir.path);
+
+        // Split the path into components and check if any component is 'src'
+        final pathParts = p.split(relativePath);
+
+        // Exclude if 'src' appears as a directory component (not in the filename)
+        // Check all parts except the last one (the filename)
+        var containsSrc = false;
+        for (var i = 0; i < pathParts.length - 1; i++) {
+          if (pathParts[i] == 'src') {
+            containsSrc = true;
+            break;
+          }
+        }
+
+        if (!containsSrc) {
+          publicLibraries.add(entity);
+        }
+      }
+    }
+
+    return publicLibraries;
   }
 
   /// Resolves the Dart SDK path from the Flutter installation.
@@ -197,44 +269,6 @@ class PackageApiAnalyzer {
     }
   }
 
-  /// Extracts the public API from a library element.
-  Map<String, dynamic> _extractLibraryApi(LibraryElement library) {
-    final result = <String, dynamic>{};
-
-    final classes = <Map<String, dynamic>>[];
-
-    // Extract all top-level class declarations from all fragments
-    for (final fragment in library.fragments) {
-      for (final classFragment in fragment.classes) {
-        final element = classFragment.element;
-        // Only process public elements (not starting with underscore)
-        if (element.name == null || element.name!.startsWith('_')) {
-          continue;
-        }
-
-        classes.add(_extractClassApi(element));
-      }
-    }
-
-    result['classes'] = classes;
-    return result;
-  }
-
-  /// A distributing function that uses the appropriate extractor based on element type. Returns null for unsupported types.
-  Map<String, dynamic>? _tryExtractElement(Element element) => switch (element) {
-    ClassElement() => _extractClassApi(element),
-    ConstructorElement() => _extractConstructorApi(element),
-    TypeParameterElement() => _extractTypeParameterApi(element),
-    ExecutableElement() => _extractMemberApi(element),
-    _ => null, // Unsupported element type
-  };
-
-  /// Extracts API information from a type parameter.
-  Map<String, dynamic> _extractTypeParameterApi(TypeParameterElement typeParam) => {
-    'name': typeParam.name,
-    'bound': typeParam.bound?.getDisplayString(),
-  };
-
   /// Extracts the public API from a class element.
   Map<String, dynamic> _extractClassApi(ClassElement classElement) {
     final classData = <String, dynamic>{'name': classElement.name};
@@ -246,7 +280,9 @@ class PackageApiAnalyzer {
 
     // Add type parameters for generic classes
     if (classElement.typeParameters.isNotEmpty) {
-      classData['typeParameters'] = classElement.typeParameters.map(_extractTypeParameterApi).toList();
+      classData['typeParameters'] = classElement.typeParameters
+          .map((tp) => {'name': tp.name, 'bound': tp.bound?.getDisplayString()})
+          .toList();
     }
 
     // Add superclass
@@ -365,6 +401,118 @@ class PackageApiAnalyzer {
     }
 
     return constructorData;
+  }
+
+  /// Extracts the public API from an enum element.
+  Map<String, dynamic> _extractEnumApi(EnumElement enumElement) {
+    final enumData = <String, dynamic>{'name': enumElement.name};
+
+    // Add documentation if present
+    if (enumElement.documentationComment != null) {
+      enumData['documentation'] = enumElement.documentationComment;
+    }
+
+    // Add enum values
+    final values = <Map<String, dynamic>>[];
+    for (final field in enumElement.fields) {
+      // Only include enum constant values, not synthetic fields
+      if (field.isEnumConstant) {
+        values.add({'name': field.name, if (field.documentationComment != null) 'documentation': field.documentationComment});
+      }
+    }
+    enumData['values'] = values;
+
+    // Extract members (methods, getters, etc.) similar to classes
+    final members = <Map<String, dynamic>>[];
+
+    // Add constructors
+    for (final constructor in enumElement.constructors) {
+      // Skip private and synthetic constructors
+      if (constructor.name != null && constructor.name!.startsWith('_')) {
+        continue;
+      }
+      if (constructor.isSynthetic) {
+        continue;
+      }
+
+      members.add(_extractConstructorApi(constructor));
+    }
+
+    // Get all members from the enum interface
+    for (final member in enumElement.interfaceMembers.values) {
+      // Skip private members
+      final memberName = member.name;
+      if (memberName == null || memberName.startsWith('_')) {
+        continue;
+      }
+
+      members.add(_extractMemberApi(member));
+    }
+
+    if (members.isNotEmpty) {
+      enumData['members'] = members;
+    }
+
+    // Add interfaces
+    if (enumElement.interfaces.isNotEmpty) {
+      enumData['interfaces'] = enumElement.interfaces.map(_formatDartType).toList();
+    }
+
+    // Add mixins
+    if (enumElement.mixins.isNotEmpty) {
+      enumData['mixins'] = enumElement.mixins.map(_formatDartType).toList();
+    }
+
+    return enumData;
+  }
+
+  /// Extracts the public API from a top-level variable element.
+  Map<String, dynamic> _extractTopLevelVariableApi(TopLevelVariableElement variable) {
+    final variableData = <String, dynamic>{'name': variable.name, 'type': _formatDartType(variable.type)};
+
+    // Add documentation if present
+    if (variable.documentationComment != null) {
+      variableData['documentation'] = variable.documentationComment;
+    }
+
+    variableData['isConst'] = variable.isConst;
+    variableData['isFinal'] = variable.isFinal;
+    variableData['isLate'] = variable.isLate;
+
+    return variableData;
+  }
+
+  /// Extracts the public API from a top-level function element.
+  Map<String, dynamic> _extractFunctionApi(TopLevelFunctionElement function) {
+    final functionData = <String, dynamic>{'name': function.name, 'returnType': _formatDartType(function.returnType)};
+
+    // Add documentation if present
+    if (function.documentationComment != null) {
+      functionData['documentation'] = function.documentationComment;
+    }
+
+    // Add type parameters for generic functions
+    if (function.typeParameters.isNotEmpty) {
+      functionData['typeParameters'] = function.typeParameters
+          .map((tp) => {'name': tp.name, 'bound': tp.bound?.getDisplayString()})
+          .toList();
+    }
+
+    // Add parameters
+    if (function.formalParameters.isNotEmpty) {
+      functionData['parameters'] = function.formalParameters.map((p) {
+        return {
+          'name': p.name,
+          'type': _formatDartType(p.type),
+          'isOptional': p.isOptional,
+          'isNamed': p.isNamed,
+          'hasDefaultValue': p.hasDefaultValue,
+          'isRequired': p.isRequired,
+        };
+      }).toList();
+    }
+
+    return functionData;
   }
 
   /// Formats a DartType into a string representation with type arguments.
