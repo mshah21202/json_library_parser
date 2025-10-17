@@ -22,7 +22,7 @@ void main() {
 
       // Convert to prettified JSON
       const encoder = JsonEncoder.withIndent('  ');
-      final prettyJson = encoder.convert(result);
+      final prettyJson = encoder.convert(result.toJson());
 
       // Write to file
       final outputFile = File(outputPath);
@@ -37,7 +37,7 @@ void main() {
       print('=' * 80 + '\n');
 
       // Basic assertion to ensure we got some result
-      expect(result, isNotEmpty);
+      expect(result.elements, isNotEmpty);
       expect(outputFile.existsSync(), isTrue);
     });
   });

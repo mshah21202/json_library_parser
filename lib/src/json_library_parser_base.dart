@@ -5,9 +5,11 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:path/path.dart' as p;
 
-/// Analyzes Dart packages and extracts their public API surface as JSON.
+import 'models.dart' as models;
+
+/// Analyzes Dart packages and extracts their public API surface.
 class PackageApiAnalyzer {
-  /// Analyzes a Dart package and returns its public API as JSON.
+  /// Analyzes a Dart package and returns its public API.
   ///
   /// [packagePath] should be the root directory of the package to analyze.
   /// The package must contain a `pubspec.yaml` file.
@@ -16,8 +18,8 @@ class PackageApiAnalyzer {
   /// runs `pub get` to ensure all dependencies are resolved. This is useful
   /// for packages in `.pub-cache` or read-only locations. Defaults to false.
   ///
-  /// Returns a Map containing the JSON representation of the package's public API.
-  /// The structure includes:
+  /// Returns a [models.PackageAnalysisResult] containing all public API elements.
+  /// The result includes:
   /// - Classes with members, inheritance, and type parameters
   /// - Enums with their values and members
   /// - Top-level functions with parameters and return types
@@ -28,7 +30,7 @@ class PackageApiAnalyzer {
   ///
   /// Throws [ArgumentError] if the package path is invalid or doesn't contain
   /// a pubspec.yaml file.
-  Future<Map<String, dynamic>> analyzePackage(String packagePath, {bool copyToTemp = false}) async {
+  Future<models.PackageAnalysisResult> analyzePackage(String packagePath, {bool copyToTemp = false}) async {
     // Validate package path
     final packageDir = Directory(packagePath);
     if (!await packageDir.exists()) {
@@ -75,7 +77,7 @@ class PackageApiAnalyzer {
       // Find all public library files
       final libDir = Directory(p.join(analysisPath, 'lib'));
       if (!await libDir.exists()) {
-        return result; // No lib directory, return empty result
+        return models.PackageAnalysisResult(elements: []); // No lib directory, return empty result
       }
 
       // Read pubspec.yaml to get package name
@@ -86,7 +88,7 @@ class PackageApiAnalyzer {
       final publicLibraryFiles = await _findPublicLibraries(libDir);
 
       if (publicLibraryFiles.isEmpty) {
-        return result; // No public libraries found
+        return models.PackageAnalysisResult(elements: []); // No public libraries found
       }
 
       // Map to track which elements are exported by which package URIs
@@ -130,6 +132,9 @@ class PackageApiAnalyzer {
       // Group elements and add importableFrom/definedIn metadata
       final elementsData = <Map<String, dynamic>>[];
 
+      // Track variables we've already processed to avoid duplicates
+      final processedVariables = <TopLevelVariableElement>{};
+
       for (final entry in elementToUris.entries) {
         final element = entry.key;
         final importableFromUris = entry.value.toList()..sort();
@@ -145,13 +150,27 @@ class PackageApiAnalyzer {
         } else if (element is TopLevelVariableElement) {
           elementData = _extractTopLevelVariableApi(element);
           elementData['elementType'] = 'variable';
+          processedVariables.add(element);
         } else if (element is TopLevelFunctionElement) {
           elementData = _extractFunctionApi(element);
           elementData['elementType'] = 'function';
         } else if (element is PropertyAccessorElement) {
-          // Top-level getters/setters for variables are handled via TopLevelVariableElement
-          // Skip them here to avoid duplication
-          continue;
+          // Top-level getters/setters for variables - extract the variable element
+          final variable = element.variable;
+          if (variable is TopLevelVariableElement && !processedVariables.contains(variable)) {
+            elementData = _extractTopLevelVariableApi(variable);
+            elementData['elementType'] = 'variable';
+            processedVariables.add(variable);
+
+            // Update the URIs to point to the variable's URIs (from the accessor)
+            elementData['importableFrom'] = importableFromUris;
+            elementData['definedIn'] = variable.library.uri.toString();
+            elementsData.add(elementData);
+            continue;
+          } else {
+            // Skip if already processed or not a top-level variable
+            continue;
+          }
         }
 
         if (elementData != null) {
@@ -163,7 +182,8 @@ class PackageApiAnalyzer {
 
       result['elements'] = elementsData;
 
-      return result;
+      // Convert the raw JSON to models
+      return models.PackageAnalysisResult.fromJson(result);
     } catch (e) {
       throw Exception('Failed to analyze package: $e');
     } finally {
@@ -323,6 +343,12 @@ class PackageApiAnalyzer {
         continue;
       }
 
+      // Skip members from dart:core
+      final sourceUri = member.library.uri.toString();
+      if (sourceUri == 'dart:core') {
+        continue;
+      }
+
       members.add(_extractMemberApi(member));
     }
 
@@ -443,6 +469,12 @@ class PackageApiAnalyzer {
       // Skip private members
       final memberName = member.name;
       if (memberName == null || memberName.startsWith('_')) {
+        continue;
+      }
+
+      // Skip members from dart:core
+      final sourceUri = member.library.uri.toString();
+      if (sourceUri == 'dart:core') {
         continue;
       }
 

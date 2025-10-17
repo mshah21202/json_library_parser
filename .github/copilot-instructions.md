@@ -42,7 +42,8 @@ await analyzer.analyzePackage(packagePath, copyToTemp: true);
 The package enforces Dart's privacy rules:
 - **Classes/members**: Skip if name starts with `_`
 - **Files**: Exclude entire `lib/src/` directory via `_findPublicLibraries()` (multi-level: `lib/foo/src/` also excluded)
-- Uses `classElement.interfaceMembers` to get **complete interface** (declared + inherited members)
+- **dart:core members**: Excludes inherited members from `dart:core` (e.g., `toString`, `hashCode`, `noSuchMethod`, `runtimeType`) to focus on the package's actual API surface
+- Uses `classElement.interfaceMembers` to get **complete interface** (declared + inherited members from user code)
 
 ## Key Development Patterns
 
@@ -59,6 +60,8 @@ Each member includes `location` field showing source URI:
 memberData['location'] = member.library.uri.toString();
 ```
 This allows tracking which library defines each member (especially important for inherited members).
+
+**Note**: Members with `location: "dart:core"` are filtered out during extraction to focus on the package's actual API surface rather than inherited Object methods.
 
 ### Constructor Handling Edge Case
 Unnamed constructors may return `'new'` as name - normalize to empty string:
