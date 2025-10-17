@@ -321,21 +321,115 @@ class PackageApiAnalyzer {
       classData['mixins'] = classElement.mixins.map(_formatDartType).toList();
     }
 
-    // Extract all interface members (both declared and inherited)
+    // Extract all members from children
     final members = <Map<String, dynamic>>[];
 
-    // First, add constructors
-    for (final constructor in classElement.constructors) {
-      // Skip private constructors
-      if (constructor.name != null && constructor.name!.startsWith('_')) {
+    // Maps to track fields and their accessors
+    final fieldElements = <String, FieldElement>{};
+    final getters = <String, PropertyAccessorElement>{};
+    final setters = <String, PropertyAccessorElement>{};
+    final otherMembers = <Element>[];
+
+    // First pass: categorize all children (declared members only)
+    for (final child in classElement.children) {
+      // Skip private members
+      final childName = child.name;
+      if (childName == null || childName.startsWith('_')) {
         continue;
       }
 
-      members.add(_extractConstructorApi(constructor));
+      // Skip members from dart:core
+      final sourceUri = child.library?.uri.toString();
+      if (sourceUri == 'dart:core') {
+        continue;
+      }
+
+      if (child is FieldElement) {
+        fieldElements[childName] = child;
+      } else if (child is PropertyAccessorElement) {
+        if (child.kind == ElementKind.GETTER) {
+          getters[childName] = child;
+        } else if (child.kind == ElementKind.SETTER) {
+          // Setter names end with '=', remove it for matching
+          final baseName = childName.endsWith('=') ? childName.substring(0, childName.length - 1) : childName;
+          setters[baseName] = child;
+        }
+      } else {
+        otherMembers.add(child);
+      }
     }
 
-    // Get all members from the class interface (includes inherited members)
-    // interfaceMembers is a Map<Name, ExecutableElement>
+    // Second pass: apply field rules and extract members
+    // Process constructors first
+    for (final member in otherMembers) {
+      if (member is ConstructorElement) {
+        members.add(_extractConstructorApi(member));
+      }
+    }
+
+    // Track which members we've already processed
+    final processedMemberNames = <String>{};
+
+    // Process fields with their accessors (declared members only)
+    final processedFields = <String>{};
+    for (final entry in fieldElements.entries) {
+      final fieldName = entry.key;
+      final field = entry.value;
+
+      final hasGetter = getters.containsKey(fieldName);
+      final hasSetter = setters.containsKey(fieldName);
+
+      if (hasGetter && hasSetter) {
+        // Rule 1: Field has both getter and setter -> keep as field
+        members.add(_extractFieldApi(field));
+        processedFields.add(fieldName);
+        processedMemberNames.add(fieldName);
+      } else if (hasGetter) {
+        // Rule 2: Field has only getter -> treat as getter, skip field
+        members.add(_extractAccessorApi(getters[fieldName]!));
+        processedFields.add(fieldName);
+        processedMemberNames.add(fieldName);
+      } else if (hasSetter) {
+        // Rule 2: Field has only setter -> treat as setter, skip field
+        members.add(_extractAccessorApi(setters[fieldName]!));
+        processedFields.add(fieldName);
+        processedMemberNames.add(fieldName);
+      } else {
+        // Field with no accessors (shouldn't normally happen, but handle it)
+        members.add(_extractFieldApi(field));
+        processedFields.add(fieldName);
+        processedMemberNames.add(fieldName);
+      }
+    }
+
+    // Add standalone getters/setters (those without corresponding fields)
+    for (final entry in getters.entries) {
+      if (!processedFields.contains(entry.key)) {
+        members.add(_extractAccessorApi(entry.value));
+        processedMemberNames.add(entry.key);
+      }
+    }
+
+    for (final entry in setters.entries) {
+      if (!processedFields.contains(entry.key)) {
+        members.add(_extractAccessorApi(entry.value));
+        processedMemberNames.add(entry.key);
+      }
+    }
+
+    // Process other declared members (methods, etc.)
+    for (final member in otherMembers) {
+      if (member is! ConstructorElement) {
+        if (member is MethodElement) {
+          members.add(_extractMethodApi(member));
+          if (member.name != null) {
+            processedMemberNames.add(member.name!);
+          }
+        }
+      }
+    }
+
+    // Now add inherited members from interfaceMembers (exclude already processed declared members)
     for (final member in classElement.interfaceMembers.values) {
       // Skip private members
       final memberName = member.name;
@@ -349,12 +443,100 @@ class PackageApiAnalyzer {
         continue;
       }
 
+      // Skip if we already processed this member from children (it's declared, not inherited)
+      if (processedMemberNames.contains(memberName)) {
+        continue;
+      }
+
+      // This is an inherited member, extract it
       members.add(_extractMemberApi(member));
     }
 
     classData['members'] = members;
 
     return classData;
+  }
+
+  /// Extracts API information from a field element.
+  Map<String, dynamic> _extractFieldApi(FieldElement field) {
+    final fieldData = <String, dynamic>{
+      'name': field.name,
+      'kind': 'field',
+      'type': _formatDartType(field.type),
+      'isStatic': field.isStatic,
+    };
+
+    // Add source location if available
+    final sourceUri = field.library.uri.toString();
+    fieldData['location'] = sourceUri;
+
+    // Add modifiers
+    if (field.isFinal) {
+      fieldData['isFinal'] = true;
+    }
+    if (field.isLate) {
+      fieldData['isLate'] = true;
+    }
+    if (field.isConst) {
+      fieldData['isConst'] = true;
+    }
+
+    return fieldData;
+  }
+
+  /// Extracts API information from a property accessor (getter or setter).
+  Map<String, dynamic> _extractAccessorApi(PropertyAccessorElement accessor) {
+    final isGetter = accessor.kind == ElementKind.GETTER;
+    final accessorData = <String, dynamic>{'name': accessor.name, 'kind': isGetter ? 'getter' : 'setter', 'isStatic': accessor.isStatic};
+
+    // Add source location if available
+    final sourceUri = accessor.library.uri.toString();
+    accessorData['location'] = sourceUri;
+
+    if (isGetter) {
+      accessorData['returnType'] = _formatDartType(accessor.returnType);
+    } else {
+      // Setter has a single parameter
+      if (accessor.formalParameters.isNotEmpty) {
+        accessorData['parameterType'] = _formatDartType(accessor.formalParameters.first.type);
+      }
+    }
+
+    return accessorData;
+  }
+
+  /// Extracts API information from a method element.
+  Map<String, dynamic> _extractMethodApi(MethodElement method) {
+    final methodData = <String, dynamic>{
+      'name': method.name,
+      'kind': method.isOperator ? 'operator' : 'method',
+      'isStatic': method.isStatic,
+      'returnType': _formatDartType(method.returnType),
+    };
+
+    // Add source location if available
+    final sourceUri = method.library.uri.toString();
+    methodData['location'] = sourceUri;
+
+    // Add parameters
+    if (method.formalParameters.isNotEmpty) {
+      methodData['parameters'] = method.formalParameters.map((p) {
+        return {
+          'name': p.name,
+          'type': _formatDartType(p.type),
+          'isOptional': p.isOptional,
+          'isNamed': p.isNamed,
+          'hasDefaultValue': p.hasDefaultValue,
+        };
+      }).toList();
+    }
+
+    // Add type parameters for generic methods
+    if (method.typeParameters.isNotEmpty) {
+      methodData['typeParameters'] = method.typeParameters.map((tp) => {'name': tp.name, 'bound': tp.bound?.getDisplayString()}).toList();
+    }
+
+    return methodData;
   }
 
   /// Extracts API information from a class member.

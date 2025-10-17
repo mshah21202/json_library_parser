@@ -282,6 +282,7 @@ sealed class MemberElement {
       'method' || 'operator' => MethodMember.fromJson(json),
       'getter' => GetterMember.fromJson(json),
       'setter' => SetterMember.fromJson(json),
+      'field' => FieldMember.fromJson(json),
       _ => throw ArgumentError('Unknown member kind: $kind'),
     };
   }
@@ -405,6 +406,46 @@ class SetterMember extends MemberElement {
       location: json['location'] as String,
       isStatic: json['isStatic'] as bool,
       parameterType: json['parameterType'] as String,
+    );
+  }
+}
+
+/// Represents a field.
+class FieldMember extends MemberElement {
+  /// Whether the field is static.
+  final bool isStatic;
+
+  /// Type of the field.
+  final String type;
+
+  /// Whether the field is final.
+  final bool isFinal;
+
+  /// Whether the field is const.
+  final bool isConst;
+
+  const FieldMember({
+    required super.name,
+    required super.location,
+    required this.isStatic,
+    required this.type,
+    required this.isFinal,
+    required this.isConst,
+  }) : super(kind: 'field');
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {'name': name, 'kind': kind, 'location': location, 'isStatic': isStatic, 'type': type, 'isFinal': isFinal, 'isConst': isConst};
+  }
+
+  factory FieldMember.fromJson(Map<String, dynamic> json) {
+    return FieldMember(
+      name: json['name'] as String,
+      location: json['location'] as String,
+      isStatic: json['isStatic'] as bool,
+      type: json['type'] as String,
+      isFinal: json['isFinal'] as bool,
+      isConst: json['isConst'] as bool,
     );
   }
 }
