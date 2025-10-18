@@ -9,7 +9,7 @@ void main() {
       final analyzer = PackageApiAnalyzer();
 
       // Package in .pub-cache (read-only)
-      const packagePath = '/Users/mohamadshahin/.pub-cache/hosted/pub.dev/nfc_manager-3.5.0';
+      const packagePath = '/Users/mohamadshahin/.pub-cache/hosted/pub.dev/shopify_flutter-2.6.0';
       const outputPath = 'analysis_output.json';
 
       print('\n${'=' * 80}');

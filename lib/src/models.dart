@@ -251,9 +251,9 @@ class VariableElement extends ApiElement {
       definedIn: json['definedIn'] as String,
       documentation: json['documentation'] as String?,
       type: json['type'] as String,
-      isConst: json['isConst'] as bool,
-      isFinal: json['isFinal'] as bool,
-      isLate: json['isLate'] as bool,
+      isConst: json['isConst'] as bool? ?? false,
+      isFinal: json['isFinal'] as bool? ?? false,
+      isLate: json['isLate'] as bool? ?? false,
     );
   }
 }
@@ -351,7 +351,7 @@ class MethodMember extends MemberElement {
       name: json['name'] as String,
       kind: json['kind'] as String,
       location: json['location'] as String,
-      isStatic: json['isStatic'] as bool,
+      isStatic: json['isStatic'] as bool? ?? false,
       returnType: json['returnType'] as String,
       parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
     );
@@ -378,7 +378,7 @@ class GetterMember extends MemberElement {
     return GetterMember(
       name: json['name'] as String,
       location: json['location'] as String,
-      isStatic: json['isStatic'] as bool,
+      isStatic: json['isStatic'] as bool? ?? false,
       returnType: json['returnType'] as String,
     );
   }
@@ -404,7 +404,7 @@ class SetterMember extends MemberElement {
     return SetterMember(
       name: json['name'] as String,
       location: json['location'] as String,
-      isStatic: json['isStatic'] as bool,
+      isStatic: json['isStatic'] as bool? ?? false,
       parameterType: json['parameterType'] as String,
     );
   }
@@ -442,10 +442,10 @@ class FieldMember extends MemberElement {
     return FieldMember(
       name: json['name'] as String,
       location: json['location'] as String,
-      isStatic: json['isStatic'] as bool,
+      isStatic: json['isStatic'] as bool? ?? false,
       type: json['type'] as String,
-      isFinal: json['isFinal'] as bool,
-      isConst: json['isConst'] as bool,
+      isFinal: json['isFinal'] as bool? ?? false,
+      isConst: json['isConst'] as bool? ?? false,
     );
   }
 }
@@ -513,9 +513,9 @@ class Parameter {
     return Parameter(
       name: json['name'] as String,
       type: json['type'] as String,
-      isOptional: json['isOptional'] as bool,
-      isNamed: json['isNamed'] as bool,
-      hasDefaultValue: json['hasDefaultValue'] as bool,
+      isOptional: json['isOptional'] as bool? ?? false,
+      isNamed: json['isNamed'] as bool? ?? false,
+      hasDefaultValue: json['hasDefaultValue'] as bool? ?? false,
       isRequired: json['isRequired'] as bool?,
     );
   }
