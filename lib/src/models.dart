@@ -47,8 +47,10 @@ class ClassElement extends ApiElement {
   /// Type parameters for generic classes.
   final List<TypeParameter>? typeParameters;
 
-  /// The superclass name (if any, excluding Object).
-  final String? superclass;
+  /// The inheritance chain (list of superclasses, excluding Object).
+  /// For example, if a class extends StatelessWidget, this would be
+  /// [StatelessWidget, Widget] showing the full inheritance chain.
+  final List<String>? superclass;
 
   /// Interfaces implemented by this class.
   final List<String>? interfaces;
@@ -94,7 +96,7 @@ class ClassElement extends ApiElement {
       definedIn: json['definedIn'] as String,
       documentation: json['documentation'] as String?,
       typeParameters: (json['typeParameters'] as List?)?.map((tp) => TypeParameter.fromJson(tp as Map<String, dynamic>)).toList(),
-      superclass: json['superclass'] as String?,
+      superclass: (json['superclass'] as List?)?.cast<String>(),
       interfaces: (json['interfaces'] as List?)?.cast<String>(),
       mixins: (json['mixins'] as List?)?.cast<String>(),
       members: (json['members'] as List).map((m) => MemberElement.fromJson(m as Map<String, dynamic>)).toList(),

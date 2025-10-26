@@ -289,6 +289,23 @@ class PackageApiAnalyzer {
     }
   }
 
+  /// Builds the inheritance chain for a class element.
+  ///
+  /// Returns a list of superclass names starting from the immediate superclass
+  /// up to the root (excluding Object). For example, if a class extends
+  /// StatelessWidget which extends Widget, this returns [StatelessWidget, Widget].
+  List<String> _buildSuperclassChain(ClassElement classElement) {
+    final chain = <String>[];
+    var currentType = classElement.supertype;
+
+    while (currentType != null && !currentType.isDartCoreObject) {
+      chain.add(_formatDartType(currentType));
+      currentType = currentType.element.supertype;
+    }
+
+    return chain;
+  }
+
   /// Extracts the public API from a class element.
   Map<String, dynamic> _extractClassApi(ClassElement classElement) {
     final classData = <String, dynamic>{'name': classElement.name};
@@ -305,10 +322,10 @@ class PackageApiAnalyzer {
           .toList();
     }
 
-    // Add superclass
-    final supertype = classElement.supertype;
-    if (supertype != null && !supertype.isDartCoreObject) {
-      classData['superclass'] = _formatDartType(supertype);
+    // Add superclass chain
+    final superclassChain = _buildSuperclassChain(classElement);
+    if (superclassChain.isNotEmpty) {
+      classData['superclass'] = superclassChain;
     }
 
     // Add interfaces
