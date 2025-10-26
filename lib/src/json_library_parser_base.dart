@@ -308,7 +308,7 @@ class PackageApiAnalyzer {
 
   /// Extracts the public API from a class element.
   Map<String, dynamic> _extractClassApi(ClassElement classElement) {
-    final classData = <String, dynamic>{'name': classElement.name};
+    final classData = <String, dynamic>{'name': classElement.name, 'isAbstract': classElement.isAbstract};
 
     // Add documentation if present
     if (classElement.documentationComment != null) {

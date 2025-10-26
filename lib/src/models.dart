@@ -58,6 +58,9 @@ class ClassElement extends ApiElement {
   /// Mixins used by this class.
   final List<String>? mixins;
 
+  /// Whether this class is abstract.
+  final bool isAbstract;
+
   /// Members of this class (constructors, methods, getters, setters).
   final List<MemberElement> members;
 
@@ -70,6 +73,7 @@ class ClassElement extends ApiElement {
     this.superclass,
     this.interfaces,
     this.mixins,
+    required this.isAbstract,
     required this.members,
   }) : super(elementType: 'class');
 
@@ -83,6 +87,7 @@ class ClassElement extends ApiElement {
       if (superclass != null) 'superclass': superclass,
       if (interfaces != null && interfaces!.isNotEmpty) 'interfaces': interfaces,
       if (mixins != null && mixins!.isNotEmpty) 'mixins': mixins,
+      'isAbstract': isAbstract,
       'members': members.map((m) => m.toJson()).toList(),
       'importableFrom': importableFrom,
       'definedIn': definedIn,
@@ -99,6 +104,7 @@ class ClassElement extends ApiElement {
       superclass: (json['superclass'] as List?)?.cast<String>(),
       interfaces: (json['interfaces'] as List?)?.cast<String>(),
       mixins: (json['mixins'] as List?)?.cast<String>(),
+      isAbstract: json['isAbstract'] as bool? ?? false,
       members: (json['members'] as List).map((m) => MemberElement.fromJson(m as Map<String, dynamic>)).toList(),
     );
   }
