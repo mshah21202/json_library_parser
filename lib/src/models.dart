@@ -301,7 +301,10 @@ class ConstructorMember extends MemberElement {
   /// Parameters of the constructor.
   final List<Parameter>? parameters;
 
-  const ConstructorMember({required super.name, required super.location, this.parameters}) : super(kind: 'constructor');
+  final bool isConst;
+
+  const ConstructorMember({required super.name, required super.location, this.parameters, required this.isConst})
+    : super(kind: 'constructor');
 
   @override
   Map<String, dynamic> toJson() {
@@ -309,6 +312,7 @@ class ConstructorMember extends MemberElement {
       'name': name,
       'kind': kind,
       'location': location,
+      'isConst': isConst,
       if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
     };
   }
@@ -318,6 +322,7 @@ class ConstructorMember extends MemberElement {
       name: json['name'] as String,
       location: json['location'] as String,
       parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
+      isConst: json['isConst'] as bool? ?? false,
     );
   }
 }

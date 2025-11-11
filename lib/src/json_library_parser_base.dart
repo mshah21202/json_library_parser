@@ -605,7 +605,7 @@ class PackageApiAnalyzer {
       constructorName = '';
     }
 
-    final constructorData = <String, dynamic>{'name': constructorName, 'kind': 'constructor'};
+    final constructorData = <String, dynamic>{'name': constructorName, 'kind': 'constructor', 'isConst': constructor.isConst};
 
     // Add source location if available
     final sourceUri = constructor.library.uri.toString();
