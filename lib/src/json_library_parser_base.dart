@@ -232,7 +232,7 @@ class PackageApiAnalyzer {
     final publicLibraries = <File>[];
 
     await for (final entity in libDir.list(recursive: true)) {
-      if (entity is File && entity.path.endsWith('.dart')) {
+      if (entity is File && entity.path.endsWith('.dart') && !entity.path.endsWith('.g.dart')) {
         // Get the relative path from lib directory
         final relativePath = p.relative(entity.path, from: libDir.path);
 
