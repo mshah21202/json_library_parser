@@ -540,6 +540,9 @@ class Parameter {
   /// Whether the parameter is required (for named parameters).
   final bool? isRequired;
 
+  /// Code representing the default value (if any).
+  final String? defaultValueCode;
+
   const Parameter({
     required this.name,
     required this.type,
@@ -548,6 +551,7 @@ class Parameter {
     required this.hasDefaultValue,
     this.isRequired,
     this.typeRef,
+    this.defaultValueCode,
   });
 
   Map<String, dynamic> toJson() => {
@@ -556,6 +560,7 @@ class Parameter {
     'isOptional': isOptional,
     'isNamed': isNamed,
     'hasDefaultValue': hasDefaultValue,
+    if (defaultValueCode != null) 'defaultValueCode': defaultValueCode,
     if (isRequired != null) 'isRequired': isRequired,
     if (typeRef != null) 'typeRef': typeRef!.toJson(),
   };
@@ -567,6 +572,7 @@ class Parameter {
     isNamed: json['isNamed'] as bool? ?? false,
     hasDefaultValue: json['hasDefaultValue'] as bool? ?? false,
     isRequired: json['isRequired'] as bool?,
+    defaultValueCode: json['defaultValueCode'] as String?,
     typeRef: json['typeRef'] == null ? null : Type.fromJson(json['typeRef'] as Map<String, dynamic>),
   );
 }
