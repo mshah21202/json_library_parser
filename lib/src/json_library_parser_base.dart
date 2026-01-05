@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:path/path.dart' as p;
 
@@ -9,6 +10,8 @@ import 'models.dart' as models;
 
 /// Analyzes Dart packages and extracts their public API surface.
 class PackageApiAnalyzer {
+  final List<LibraryElement> publicLibraries = [];
+
   /// Analyzes a Dart package and returns its public API.
   ///
   /// [packagePath] should be the root directory of the package to analyze.
@@ -80,10 +83,6 @@ class PackageApiAnalyzer {
         return models.PackageAnalysisResult(elements: []); // No lib directory, return empty result
       }
 
-      // Read pubspec.yaml to get package name
-      final pubspecContent = await pubspecFile.readAsString();
-      final packageName = _extractPackageName(pubspecContent);
-
       // Find all public library files (exclude lib/src/** at any level)
       final publicLibraryFiles = await _findPublicLibraries(libDir);
 
@@ -91,27 +90,18 @@ class PackageApiAnalyzer {
         return models.PackageAnalysisResult(elements: []); // No public libraries found
       }
 
+      await _loadPublicLibraries(collection, publicLibraryFiles);
+
       // Map to track which elements are exported by which package URIs
       // Key: Element object, Value: Set of package URIs that export this element
       final elementToUris = <Element, Set<String>>{};
 
       // Process each public library
-      for (final libraryFile in publicLibraryFiles) {
-        final context = collection.contextFor(libraryFile.path);
-        final session = context.currentSession;
-        final libraryResult = await session.getResolvedLibrary(libraryFile.path);
-
-        if (libraryResult is! ResolvedLibraryResult) {
-          print('Warning: Failed to resolve library: ${libraryFile.path}');
-          continue;
-        }
-
-        final libraryElement = libraryResult.element;
+      for (final libraryElement in publicLibraries) {
         final exportNamespace = libraryElement.exportNamespace;
 
         // Construct package URI for this library
-        final relativePath = p.relative(libraryFile.path, from: libDir.path);
-        final packageUri = 'package:$packageName/$relativePath';
+        final packageUri = libraryElement.uri.toString();
 
         // Iterate through all elements in the export namespace
         for (final entry in exportNamespace.definedNames2.entries) {
@@ -194,13 +184,15 @@ class PackageApiAnalyzer {
     }
   }
 
-  String _extractPackageName(String pubspecContent) {
-    final nameRegex = RegExp(r'^name:\s*(.+)$', multiLine: true);
-    final match = nameRegex.firstMatch(pubspecContent);
-    if (match == null) {
-      throw ArgumentError('Package name not found in pubspec.yaml');
+  Future<void> _loadPublicLibraries(AnalysisContextCollection collection, List<File> files) async {
+    for (var libraryFile in files) {
+      final context = collection.contextFor(libraryFile.path);
+      final session = context.currentSession;
+      final libraryResult = await session.getResolvedLibrary(libraryFile.path);
+      if (libraryResult is ResolvedLibraryResult) {
+        publicLibraries.add(libraryResult.element);
+      }
     }
-    return match.group(1)!.trim();
   }
 
   /// Copies a directory recursively.
@@ -306,6 +298,18 @@ class PackageApiAnalyzer {
     return chain;
   }
 
+  List<models.Type> _buildSuperclassChainTypes(ClassElement classElement) {
+    final chain = <models.Type>[];
+    var currentType = classElement.supertype;
+
+    while (currentType != null && !currentType.isDartCoreObject) {
+      chain.add(_extractDartTypeRef(currentType));
+      currentType = currentType.element.supertype;
+    }
+
+    return chain;
+  }
+
   /// Extracts the public API from a class element.
   Map<String, dynamic> _extractClassApi(ClassElement classElement) {
     final classData = <String, dynamic>{'name': classElement.name, 'isAbstract': classElement.isAbstract};
@@ -324,18 +328,20 @@ class PackageApiAnalyzer {
 
     // Add superclass chain
     final superclassChain = _buildSuperclassChain(classElement);
-    if (superclassChain.isNotEmpty) {
-      classData['superclass'] = superclassChain;
-    }
+    final superclassChainTypes = _buildSuperclassChainTypes(classElement).map(_typeToJson).toList();
+    if (superclassChain.isNotEmpty) classData['superclass'] = superclassChain;
+    if (superclassChainTypes.isNotEmpty) classData['superclassRef'] = superclassChainTypes;
 
     // Add interfaces
     if (classElement.interfaces.isNotEmpty) {
       classData['interfaces'] = classElement.interfaces.map(_formatDartType).toList();
+      classData['interfacesRef'] = classElement.interfaces.map(_extractDartTypeRef).map(_typeToJson).toList();
     }
 
     // Add mixins
     if (classElement.mixins.isNotEmpty) {
       classData['mixins'] = classElement.mixins.map(_formatDartType).toList();
+      classData['mixinsRef'] = classElement.mixins.map(_extractDartTypeRef).map(_typeToJson).toList();
     }
 
     // Extract all members from children
@@ -480,6 +486,7 @@ class PackageApiAnalyzer {
       'name': field.name,
       'kind': 'field',
       'type': _formatDartType(field.type),
+      'typeRef': _extractDartTypeRef(field.type).toJson(),
       'isStatic': field.isStatic,
     };
 
@@ -512,10 +519,12 @@ class PackageApiAnalyzer {
 
     if (isGetter) {
       accessorData['returnType'] = _formatDartType(accessor.returnType);
+      accessorData['returnTypeRef'] = _extractDartTypeRef(accessor.returnType).toJson();
     } else {
       // Setter has a single parameter
       if (accessor.formalParameters.isNotEmpty) {
         accessorData['parameterType'] = _formatDartType(accessor.formalParameters.first.type);
+        accessorData['parameterTypeRef'] = _extractDartTypeRef(accessor.formalParameters.first.type).toJson();
       }
     }
 
@@ -529,6 +538,7 @@ class PackageApiAnalyzer {
       'kind': method.isOperator ? 'operator' : 'method',
       'isStatic': method.isStatic,
       'returnType': _formatDartType(method.returnType),
+      'returnTypeRef': _extractDartTypeRef(method.returnType).toJson(),
     };
 
     // Add source location if available
@@ -537,20 +547,20 @@ class PackageApiAnalyzer {
 
     // Add parameters
     if (method.formalParameters.isNotEmpty) {
-      methodData['parameters'] = method.formalParameters.map((p) {
-        return {
-          'name': p.name,
-          'type': _formatDartType(p.type),
-          'isOptional': p.isOptional,
-          'isNamed': p.isNamed,
-          'hasDefaultValue': p.hasDefaultValue,
-        };
-      }).toList();
+      methodData['parameters'] = method.formalParameters.map((p) => _extractParameterApi(p, method.formalParameters.indexOf(p))).toList();
     }
 
     // Add type parameters for generic methods
     if (method.typeParameters.isNotEmpty) {
-      methodData['typeParameters'] = method.typeParameters.map((tp) => {'name': tp.name, 'bound': tp.bound?.getDisplayString()}).toList();
+      methodData['typeParameters'] = method.typeParameters
+          .map(
+            (tp) => {
+              'name': tp.name,
+              'bound': tp.bound?.getDisplayString(),
+              'boundRef': tp.bound != null ? _extractDartTypeRef(tp.bound!).toJson() : null,
+            },
+          )
+          .toList();
     }
 
     return methodData;
@@ -568,17 +578,10 @@ class PackageApiAnalyzer {
       memberData['kind'] = member.isOperator ? 'operator' : 'method';
       memberData['isStatic'] = member.isStatic;
       memberData['returnType'] = _formatDartType(member.returnType);
+      memberData['returnTypeRef'] = _extractDartTypeRef(member.returnType).toJson();
 
       if (member.formalParameters.isNotEmpty) {
-        memberData['parameters'] = member.formalParameters.map((p) {
-          return {
-            'name': p.name,
-            'type': _formatDartType(p.type),
-            'isOptional': p.isOptional,
-            'isNamed': p.isNamed,
-            'hasDefaultValue': p.hasDefaultValue,
-          };
-        }).toList();
+        memberData['parameters'] = member.formalParameters.map((p) => _extractParameterApi(p, member.formalParameters.indexOf(p))).toList();
       }
     } else if (member is PropertyAccessorElement) {
       // Check if it's a getter or setter based on the element's kind
@@ -588,8 +591,10 @@ class PackageApiAnalyzer {
 
       if (isGetter) {
         memberData['returnType'] = _formatDartType(member.returnType);
+        memberData['returnTypeRef'] = _extractDartTypeRef(member.returnType).toJson();
       } else {
         memberData['parameterType'] = _formatDartType(member.formalParameters.first.type);
+        memberData['parameterTypeRef'] = _extractDartTypeRef(member.formalParameters.first.type).toJson();
       }
     }
 
@@ -613,16 +618,9 @@ class PackageApiAnalyzer {
 
     // Add parameters
     if (constructor.formalParameters.isNotEmpty) {
-      constructorData['parameters'] = constructor.formalParameters.map((p) {
-        return {
-          'name': p.name,
-          'type': _formatDartType(p.type),
-          'isOptional': p.isOptional,
-          'isNamed': p.isNamed,
-          'hasDefaultValue': p.hasDefaultValue,
-          'isRequired': p.isRequired,
-        };
-      }).toList();
+      constructorData['parameters'] = constructor.formalParameters
+          .map((p) => _extractParameterApi(p, constructor.formalParameters.indexOf(p)))
+          .toList();
     }
 
     return constructorData;
@@ -687,11 +685,13 @@ class PackageApiAnalyzer {
     // Add interfaces
     if (enumElement.interfaces.isNotEmpty) {
       enumData['interfaces'] = enumElement.interfaces.map(_formatDartType).toList();
+      enumData['interfacesRef'] = enumElement.interfaces.map(_extractDartTypeRef).map(_typeToJson).toList();
     }
 
     // Add mixins
     if (enumElement.mixins.isNotEmpty) {
       enumData['mixins'] = enumElement.mixins.map(_formatDartType).toList();
+      enumData['mixinsRef'] = enumElement.mixins.map(_extractDartTypeRef).map(_typeToJson).toList();
     }
 
     return enumData;
@@ -699,7 +699,11 @@ class PackageApiAnalyzer {
 
   /// Extracts the public API from a top-level variable element.
   Map<String, dynamic> _extractTopLevelVariableApi(TopLevelVariableElement variable) {
-    final variableData = <String, dynamic>{'name': variable.name, 'type': _formatDartType(variable.type)};
+    final variableData = <String, dynamic>{
+      'name': variable.name,
+      'type': _formatDartType(variable.type),
+      'typeRef': _extractDartTypeRef(variable.type).toJson(),
+    };
 
     // Add documentation if present
     if (variable.documentationComment != null) {
@@ -715,7 +719,11 @@ class PackageApiAnalyzer {
 
   /// Extracts the public API from a top-level function element.
   Map<String, dynamic> _extractFunctionApi(TopLevelFunctionElement function) {
-    final functionData = <String, dynamic>{'name': function.name, 'returnType': _formatDartType(function.returnType)};
+    final functionData = <String, dynamic>{
+      'name': function.name,
+      'returnType': _formatDartType(function.returnType),
+      'returnTypeRef': _extractDartTypeRef(function.returnType).toJson(),
+    };
 
     // Add documentation if present
     if (function.documentationComment != null) {
@@ -725,25 +733,38 @@ class PackageApiAnalyzer {
     // Add type parameters for generic functions
     if (function.typeParameters.isNotEmpty) {
       functionData['typeParameters'] = function.typeParameters
-          .map((tp) => {'name': tp.name, 'bound': tp.bound?.getDisplayString()})
+          .map(
+            (tp) => {
+              'name': tp.name,
+              'bound': tp.bound?.getDisplayString(),
+              'boundRef': tp.bound != null ? _extractDartTypeRef(tp.bound!).toJson() : null,
+            },
+          )
           .toList();
     }
 
     // Add parameters
     if (function.formalParameters.isNotEmpty) {
-      functionData['parameters'] = function.formalParameters.map((p) {
-        return {
-          'name': p.name,
-          'type': _formatDartType(p.type),
-          'isOptional': p.isOptional,
-          'isNamed': p.isNamed,
-          'hasDefaultValue': p.hasDefaultValue,
-          'isRequired': p.isRequired,
-        };
-      }).toList();
+      functionData['parameters'] = function.formalParameters
+          .map((p) => _extractParameterApi(p, function.formalParameters.indexOf(p)))
+          .toList();
     }
 
     return functionData;
+  }
+
+  Map<String, dynamic> _extractParameterApi(FormalParameterElement parameter, int index) {
+    var name = parameter.displayName;
+    if (name == '<unnamed>') name = 'p$index';
+    return {
+      'name': name,
+      'type': _formatDartType(parameter.type),
+      'typeRef': _extractDartTypeRef(parameter.type).toJson(),
+      'isOptional': parameter.isOptional,
+      'isNamed': parameter.isNamed,
+      'hasDefaultValue': parameter.hasDefaultValue,
+      'isRequired': parameter.isRequired,
+    };
   }
 
   /// Formats a DartType into a string representation with type arguments.
@@ -769,4 +790,69 @@ class PackageApiAnalyzer {
 
     return displayString;
   }
+
+  models.Type _extractDartTypeRef(DartType type) {
+    if (type is DynamicType) return models.DynamicType();
+    if (type is VoidType) return models.VoidType();
+    if (type is NeverType || type is InvalidType) return models.VoidType();
+    if (type is TypeParameterType) {
+      final bound = type.element.bound;
+      final isNullable = type.nullabilitySuffix == NullabilitySuffix.question;
+      return models.GenericType(
+        name: type.element.displayName,
+        bound: bound != null ? _extractDartTypeRef(bound) : null,
+        isNullable: isNullable,
+      );
+    }
+
+    if (type is InterfaceType) {
+      final typeArgs = type.typeArguments.map(_extractDartTypeRef).toList();
+      final isNullable = type.nullabilitySuffix == NullabilitySuffix.question;
+      return models.ClassType(
+        name: type.element.displayName,
+        arguments: typeArgs,
+        isNullable: isNullable,
+        libraryUri: _tryFindImportingLibraryUri(type),
+      );
+    }
+
+    if (type is FunctionType) {
+      final returnType = _extractDartTypeRef(type.returnType);
+      final parameters = type.formalParameters.map((p) {
+        var name = p.displayName;
+        final index = type.formalParameters.indexOf(p);
+        if (name == '<unnamed>') name = 'p$index';
+        return models.Parameter(
+          name: name,
+          type: p.type.getDisplayString(),
+          isOptional: p.isOptional,
+          isNamed: p.isNamed,
+          hasDefaultValue: p.hasDefaultValue,
+          isRequired: p.isRequired,
+          typeRef: _extractDartTypeRef(p.type),
+        );
+      }).toList();
+      final isNullable = type.nullabilitySuffix == NullabilitySuffix.question;
+      return models.FunctionType(returnType: returnType, parameters: parameters, isNullable: isNullable);
+    }
+
+    return models.DynamicType();
+  }
+
+  Map<String, dynamic> _typeToJson(models.Type type) => type.toJson();
+
+  String? _tryFindImportingLibraryUri(DartType type) {
+    final element = type.element;
+    final name = element?.name;
+    if (element == null || name == null) return type.element?.library?.uri.toString();
+
+    for (final library in publicLibraries) {
+      final exportedElement = library.exportNamespace.get2(name);
+      if (exportedElement != null && _isSameElement(exportedElement, element)) return library.uri.toString();
+    }
+
+    return type.element?.library?.uri.toString();
+  }
+
+  bool _isSameElement(Element a, Element b) => a.library?.uri == b.library?.uri && a.name == b.name;
 }

@@ -51,12 +51,15 @@ class ClassElement extends ApiElement {
   /// For example, if a class extends StatelessWidget, this would be
   /// [StatelessWidget, Widget] showing the full inheritance chain.
   final List<String>? superclass;
+  final List<Type>? superclassRef;
 
   /// Interfaces implemented by this class.
   final List<String>? interfaces;
+  final List<Type>? interfacesRef;
 
   /// Mixins used by this class.
   final List<String>? mixins;
+  final List<Type>? mixinsRef;
 
   /// Whether this class is abstract.
   final bool isAbstract;
@@ -71,43 +74,48 @@ class ClassElement extends ApiElement {
     super.documentation,
     this.typeParameters,
     this.superclass,
+    this.superclassRef,
     this.interfaces,
+    this.interfacesRef,
     this.mixins,
+    this.mixinsRef,
     required this.isAbstract,
     required this.members,
   }) : super(elementType: 'class');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'elementType': elementType,
-      if (documentation != null) 'documentation': documentation,
-      if (typeParameters != null && typeParameters!.isNotEmpty) 'typeParameters': typeParameters!.map((tp) => tp.toJson()).toList(),
-      if (superclass != null) 'superclass': superclass,
-      if (interfaces != null && interfaces!.isNotEmpty) 'interfaces': interfaces,
-      if (mixins != null && mixins!.isNotEmpty) 'mixins': mixins,
-      'isAbstract': isAbstract,
-      'members': members.map((m) => m.toJson()).toList(),
-      'importableFrom': importableFrom,
-      'definedIn': definedIn,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'elementType': elementType,
+    if (documentation != null) 'documentation': documentation,
+    if (typeParameters != null && typeParameters!.isNotEmpty) 'typeParameters': typeParameters!.map((tp) => tp.toJson()).toList(),
+    if (superclass != null) 'superclass': superclass,
+    if (interfaces != null && interfaces!.isNotEmpty) 'interfaces': interfaces,
+    if (mixins != null && mixins!.isNotEmpty) 'mixins': mixins,
+    'isAbstract': isAbstract,
+    'members': members.map((m) => m.toJson()).toList(),
+    'importableFrom': importableFrom,
+    'definedIn': definedIn,
+    if (superclassRef != null && superclassRef!.isNotEmpty) 'superclassRef': superclassRef!.map((s) => s.toJson()).toList(),
+    if (interfacesRef != null && interfacesRef!.isNotEmpty) 'interfacesRef': interfacesRef!.map((i) => i.toJson()).toList(),
+    if (mixinsRef != null && mixinsRef!.isNotEmpty) 'mixinsRef': mixinsRef!.map((m) => m.toJson()).toList(),
+  };
 
-  factory ClassElement.fromJson(Map<String, dynamic> json) {
-    return ClassElement(
-      name: json['name'] as String,
-      importableFrom: (json['importableFrom'] as List).cast<String>(),
-      definedIn: json['definedIn'] as String,
-      documentation: json['documentation'] as String?,
-      typeParameters: (json['typeParameters'] as List?)?.map((tp) => TypeParameter.fromJson(tp as Map<String, dynamic>)).toList(),
-      superclass: (json['superclass'] as List?)?.cast<String>(),
-      interfaces: (json['interfaces'] as List?)?.cast<String>(),
-      mixins: (json['mixins'] as List?)?.cast<String>(),
-      isAbstract: json['isAbstract'] as bool? ?? false,
-      members: (json['members'] as List).map((m) => MemberElement.fromJson(m as Map<String, dynamic>)).toList(),
-    );
-  }
+  factory ClassElement.fromJson(Map<String, dynamic> json) => ClassElement(
+    name: json['name'] as String,
+    importableFrom: (json['importableFrom'] as List).cast<String>(),
+    definedIn: json['definedIn'] as String,
+    documentation: json['documentation'] as String?,
+    typeParameters: (json['typeParameters'] as List?)?.map((tp) => TypeParameter.fromJson(tp as Map<String, dynamic>)).toList(),
+    superclass: (json['superclass'] as List?)?.cast<String>(),
+    interfaces: (json['interfaces'] as List?)?.cast<String>(),
+    mixins: (json['mixins'] as List?)?.cast<String>(),
+    isAbstract: json['isAbstract'] as bool? ?? false,
+    members: (json['members'] as List).map((m) => MemberElement.fromJson(m as Map<String, dynamic>)).toList(),
+    superclassRef: (json['superclassRef'] as List?)?.map((s) => Type.fromJson(s as Map<String, dynamic>)).toList(),
+    interfacesRef: (json['interfacesRef'] as List?)?.map((i) => Type.fromJson(i as Map<String, dynamic>)).toList(),
+    mixinsRef: (json['mixinsRef'] as List?)?.map((m) => Type.fromJson(m as Map<String, dynamic>)).toList(),
+  );
 }
 
 /// Represents an enum in the analyzed package.
@@ -120,9 +128,11 @@ class EnumElement extends ApiElement {
 
   /// Interfaces implemented by this enum.
   final List<String>? interfaces;
+  final List<Type>? interfacesRef;
 
   /// Mixins used by this enum.
   final List<String>? mixins;
+  final List<Type>? mixinsRef;
 
   const EnumElement({
     required super.name,
@@ -132,42 +142,45 @@ class EnumElement extends ApiElement {
     required this.values,
     this.members,
     this.interfaces,
+    this.interfacesRef,
     this.mixins,
+    this.mixinsRef,
   }) : super(elementType: 'enum');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'elementType': elementType,
-      if (documentation != null) 'documentation': documentation,
-      'values': values.map((v) => v.toJson()).toList(),
-      if (members != null && members!.isNotEmpty) 'members': members!.map((m) => m.toJson()).toList(),
-      if (interfaces != null && interfaces!.isNotEmpty) 'interfaces': interfaces,
-      if (mixins != null && mixins!.isNotEmpty) 'mixins': mixins,
-      'importableFrom': importableFrom,
-      'definedIn': definedIn,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'elementType': elementType,
+    if (documentation != null) 'documentation': documentation,
+    'values': values.map((v) => v.toJson()).toList(),
+    if (members != null && members!.isNotEmpty) 'members': members!.map((m) => m.toJson()).toList(),
+    if (interfaces != null && interfaces!.isNotEmpty) 'interfaces': interfaces,
+    if (mixins != null && mixins!.isNotEmpty) 'mixins': mixins,
+    'importableFrom': importableFrom,
+    'definedIn': definedIn,
+    if (interfacesRef != null && interfacesRef!.isNotEmpty) 'interfacesRef': interfacesRef!.map((i) => i.toJson()).toList(),
+    if (mixinsRef != null && mixinsRef!.isNotEmpty) 'mixinsRef': mixinsRef!.map((m) => m.toJson()).toList(),
+  };
 
-  factory EnumElement.fromJson(Map<String, dynamic> json) {
-    return EnumElement(
-      name: json['name'] as String,
-      importableFrom: (json['importableFrom'] as List).cast<String>(),
-      definedIn: json['definedIn'] as String,
-      documentation: json['documentation'] as String?,
-      values: (json['values'] as List).map((v) => EnumValue.fromJson(v as Map<String, dynamic>)).toList(),
-      members: (json['members'] as List?)?.map((m) => MemberElement.fromJson(m as Map<String, dynamic>)).toList(),
-      interfaces: (json['interfaces'] as List?)?.cast<String>(),
-      mixins: (json['mixins'] as List?)?.cast<String>(),
-    );
-  }
+  factory EnumElement.fromJson(Map<String, dynamic> json) => EnumElement(
+    name: json['name'] as String,
+    importableFrom: (json['importableFrom'] as List).cast<String>(),
+    definedIn: json['definedIn'] as String,
+    documentation: json['documentation'] as String?,
+    values: (json['values'] as List).map((v) => EnumValue.fromJson(v as Map<String, dynamic>)).toList(),
+    members: (json['members'] as List?)?.map((m) => MemberElement.fromJson(m as Map<String, dynamic>)).toList(),
+    interfaces: (json['interfaces'] as List?)?.cast<String>(),
+    mixins: (json['mixins'] as List?)?.cast<String>(),
+    interfacesRef: (json['interfacesRef'] as List?)?.map((i) => Type.fromJson(i as Map<String, dynamic>)).toList(),
+    mixinsRef: (json['mixinsRef'] as List?)?.map((m) => Type.fromJson(m as Map<String, dynamic>)).toList(),
+  );
 }
 
 /// Represents a top-level function in the analyzed package.
 class FunctionElement extends ApiElement {
   /// Return type of the function.
   final String returnType;
+  final Type? returnTypeRef;
 
   /// Type parameters for generic functions.
   final List<TypeParameter>? typeParameters;
@@ -181,41 +194,41 @@ class FunctionElement extends ApiElement {
     required super.definedIn,
     super.documentation,
     required this.returnType,
+    this.returnTypeRef,
     this.typeParameters,
     this.parameters,
   }) : super(elementType: 'function');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'elementType': elementType,
-      if (documentation != null) 'documentation': documentation,
-      'returnType': returnType,
-      if (typeParameters != null && typeParameters!.isNotEmpty) 'typeParameters': typeParameters!.map((tp) => tp.toJson()).toList(),
-      if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
-      'importableFrom': importableFrom,
-      'definedIn': definedIn,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'elementType': elementType,
+    if (documentation != null) 'documentation': documentation,
+    'returnType': returnType,
+    if (returnTypeRef != null) 'returnTypeRef': returnTypeRef!.toJson(),
+    if (typeParameters != null && typeParameters!.isNotEmpty) 'typeParameters': typeParameters!.map((tp) => tp.toJson()).toList(),
+    if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
+    'importableFrom': importableFrom,
+    'definedIn': definedIn,
+  };
 
-  factory FunctionElement.fromJson(Map<String, dynamic> json) {
-    return FunctionElement(
-      name: json['name'] as String,
-      importableFrom: (json['importableFrom'] as List).cast<String>(),
-      definedIn: json['definedIn'] as String,
-      documentation: json['documentation'] as String?,
-      returnType: json['returnType'] as String,
-      typeParameters: (json['typeParameters'] as List?)?.map((tp) => TypeParameter.fromJson(tp as Map<String, dynamic>)).toList(),
-      parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
-    );
-  }
+  factory FunctionElement.fromJson(Map<String, dynamic> json) => FunctionElement(
+    name: json['name'] as String,
+    importableFrom: (json['importableFrom'] as List).cast<String>(),
+    definedIn: json['definedIn'] as String,
+    documentation: json['documentation'] as String?,
+    returnType: json['returnType'] as String,
+    returnTypeRef: json['returnTypeRef'] == null ? null : Type.fromJson(json['returnTypeRef'] as Map<String, dynamic>),
+    typeParameters: (json['typeParameters'] as List?)?.map((tp) => TypeParameter.fromJson(tp as Map<String, dynamic>)).toList(),
+    parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
+  );
 }
 
 /// Represents a top-level variable in the analyzed package.
 class VariableElement extends ApiElement {
   /// The type of the variable.
   final String type;
+  final Type? typeRef;
 
   /// Whether the variable is const.
   final bool isConst;
@@ -232,38 +245,37 @@ class VariableElement extends ApiElement {
     required super.definedIn,
     super.documentation,
     required this.type,
+    this.typeRef,
     required this.isConst,
     required this.isFinal,
     required this.isLate,
   }) : super(elementType: 'variable');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'elementType': elementType,
-      if (documentation != null) 'documentation': documentation,
-      'type': type,
-      'isConst': isConst,
-      'isFinal': isFinal,
-      'isLate': isLate,
-      'importableFrom': importableFrom,
-      'definedIn': definedIn,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'elementType': elementType,
+    if (documentation != null) 'documentation': documentation,
+    'type': type,
+    if (typeRef != null) 'typeRef': typeRef!.toJson(),
+    'isConst': isConst,
+    'isFinal': isFinal,
+    'isLate': isLate,
+    'importableFrom': importableFrom,
+    'definedIn': definedIn,
+  };
 
-  factory VariableElement.fromJson(Map<String, dynamic> json) {
-    return VariableElement(
-      name: json['name'] as String,
-      importableFrom: (json['importableFrom'] as List).cast<String>(),
-      definedIn: json['definedIn'] as String,
-      documentation: json['documentation'] as String?,
-      type: json['type'] as String,
-      isConst: json['isConst'] as bool? ?? false,
-      isFinal: json['isFinal'] as bool? ?? false,
-      isLate: json['isLate'] as bool? ?? false,
-    );
-  }
+  factory VariableElement.fromJson(Map<String, dynamic> json) => VariableElement(
+    name: json['name'] as String,
+    importableFrom: (json['importableFrom'] as List).cast<String>(),
+    definedIn: json['definedIn'] as String,
+    documentation: json['documentation'] as String?,
+    type: json['type'] as String,
+    typeRef: json['typeRef'] == null ? null : Type.fromJson(json['typeRef'] as Map<String, dynamic>),
+    isConst: json['isConst'] as bool? ?? false,
+    isFinal: json['isFinal'] as bool? ?? false,
+    isLate: json['isLate'] as bool? ?? false,
+  );
 }
 
 /// Represents a member of a class or enum.
@@ -307,24 +319,20 @@ class ConstructorMember extends MemberElement {
     : super(kind: 'constructor');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'kind': kind,
-      'location': location,
-      'isConst': isConst,
-      if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'kind': kind,
+    'location': location,
+    'isConst': isConst,
+    if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
+  };
 
-  factory ConstructorMember.fromJson(Map<String, dynamic> json) {
-    return ConstructorMember(
-      name: json['name'] as String,
-      location: json['location'] as String,
-      parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
-      isConst: json['isConst'] as bool? ?? false,
-    );
-  }
+  factory ConstructorMember.fromJson(Map<String, dynamic> json) => ConstructorMember(
+    name: json['name'] as String,
+    location: json['location'] as String,
+    parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
+    isConst: json['isConst'] as bool? ?? false,
+  );
 }
 
 /// Represents a method or operator.
@@ -334,6 +342,7 @@ class MethodMember extends MemberElement {
 
   /// Return type of the method.
   final String returnType;
+  final Type? returnTypeRef;
 
   /// Parameters of the method.
   final List<Parameter>? parameters;
@@ -344,31 +353,30 @@ class MethodMember extends MemberElement {
     required super.location,
     required this.isStatic,
     required this.returnType,
+    this.returnTypeRef,
     this.parameters,
   });
 
   @override
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'kind': kind,
-      'location': location,
-      'isStatic': isStatic,
-      'returnType': returnType,
-      if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'kind': kind,
+    'location': location,
+    'isStatic': isStatic,
+    'returnType': returnType,
+    if (returnTypeRef != null) 'returnTypeRef': returnTypeRef!.toJson(),
+    if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
+  };
 
-  factory MethodMember.fromJson(Map<String, dynamic> json) {
-    return MethodMember(
-      name: json['name'] as String,
-      kind: json['kind'] as String,
-      location: json['location'] as String,
-      isStatic: json['isStatic'] as bool? ?? false,
-      returnType: json['returnType'] as String,
-      parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
-    );
-  }
+  factory MethodMember.fromJson(Map<String, dynamic> json) => MethodMember(
+    name: json['name'] as String,
+    kind: json['kind'] as String,
+    location: json['location'] as String,
+    isStatic: json['isStatic'] as bool? ?? false,
+    returnType: json['returnType'] as String,
+    returnTypeRef: json['returnTypeRef'] == null ? null : Type.fromJson(json['returnTypeRef'] as Map<String, dynamic>),
+    parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
+  );
 }
 
 /// Represents a getter.
@@ -378,23 +386,33 @@ class GetterMember extends MemberElement {
 
   /// Return type of the getter.
   final String returnType;
+  final Type? returnTypeRef;
 
-  const GetterMember({required super.name, required super.location, required this.isStatic, required this.returnType})
-    : super(kind: 'getter');
+  const GetterMember({
+    required super.name,
+    required super.location,
+    required this.isStatic,
+    required this.returnType,
+    required this.returnTypeRef,
+  }) : super(kind: 'getter');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {'name': name, 'kind': kind, 'location': location, 'isStatic': isStatic, 'returnType': returnType};
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'kind': kind,
+    'location': location,
+    'isStatic': isStatic,
+    'returnType': returnType,
+    if (returnTypeRef != null) 'returnTypeRef': returnTypeRef!.toJson(),
+  };
 
-  factory GetterMember.fromJson(Map<String, dynamic> json) {
-    return GetterMember(
-      name: json['name'] as String,
-      location: json['location'] as String,
-      isStatic: json['isStatic'] as bool? ?? false,
-      returnType: json['returnType'] as String,
-    );
-  }
+  factory GetterMember.fromJson(Map<String, dynamic> json) => GetterMember(
+    name: json['name'] as String,
+    location: json['location'] as String,
+    isStatic: json['isStatic'] as bool? ?? false,
+    returnType: json['returnType'] as String,
+    returnTypeRef: json['returnTypeRef'] == null ? null : Type.fromJson(json['returnTypeRef'] as Map<String, dynamic>),
+  );
 }
 
 /// Represents a setter.
@@ -404,23 +422,33 @@ class SetterMember extends MemberElement {
 
   /// Type of the parameter.
   final String parameterType;
+  final Type? parameterTypeRef;
 
-  const SetterMember({required super.name, required super.location, required this.isStatic, required this.parameterType})
-    : super(kind: 'setter');
+  const SetterMember({
+    required super.name,
+    required super.location,
+    required this.isStatic,
+    required this.parameterType,
+    this.parameterTypeRef,
+  }) : super(kind: 'setter');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {'name': name, 'kind': kind, 'location': location, 'isStatic': isStatic, 'parameterType': parameterType};
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'kind': kind,
+    'location': location,
+    'isStatic': isStatic,
+    'parameterType': parameterType,
+    if (parameterTypeRef != null) 'parameterTypeRef': parameterTypeRef!.toJson(),
+  };
 
-  factory SetterMember.fromJson(Map<String, dynamic> json) {
-    return SetterMember(
-      name: json['name'] as String,
-      location: json['location'] as String,
-      isStatic: json['isStatic'] as bool? ?? false,
-      parameterType: json['parameterType'] as String,
-    );
-  }
+  factory SetterMember.fromJson(Map<String, dynamic> json) => SetterMember(
+    name: json['name'] as String,
+    location: json['location'] as String,
+    isStatic: json['isStatic'] as bool? ?? false,
+    parameterType: json['parameterType'] as String,
+    parameterTypeRef: json['parameterTypeRef'] == null ? null : Type.fromJson(json['parameterTypeRef'] as Map<String, dynamic>),
+  );
 }
 
 /// Represents a field.
@@ -430,6 +458,7 @@ class FieldMember extends MemberElement {
 
   /// Type of the field.
   final String type;
+  final Type? typeRef;
 
   /// Whether the field is final.
   final bool isFinal;
@@ -442,25 +471,32 @@ class FieldMember extends MemberElement {
     required super.location,
     required this.isStatic,
     required this.type,
+    this.typeRef,
     required this.isFinal,
     required this.isConst,
   }) : super(kind: 'field');
 
   @override
-  Map<String, dynamic> toJson() {
-    return {'name': name, 'kind': kind, 'location': location, 'isStatic': isStatic, 'type': type, 'isFinal': isFinal, 'isConst': isConst};
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'kind': kind,
+    'location': location,
+    'isStatic': isStatic,
+    'type': type,
+    'isFinal': isFinal,
+    'isConst': isConst,
+    if (typeRef != null) 'typeRef': typeRef!.toJson(),
+  };
 
-  factory FieldMember.fromJson(Map<String, dynamic> json) {
-    return FieldMember(
-      name: json['name'] as String,
-      location: json['location'] as String,
-      isStatic: json['isStatic'] as bool? ?? false,
-      type: json['type'] as String,
-      isFinal: json['isFinal'] as bool? ?? false,
-      isConst: json['isConst'] as bool? ?? false,
-    );
-  }
+  factory FieldMember.fromJson(Map<String, dynamic> json) => FieldMember(
+    name: json['name'] as String,
+    location: json['location'] as String,
+    isStatic: json['isStatic'] as bool? ?? false,
+    type: json['type'] as String,
+    typeRef: json['typeRef'] == null ? null : Type.fromJson(json['typeRef'] as Map<String, dynamic>),
+    isFinal: json['isFinal'] as bool? ?? false,
+    isConst: json['isConst'] as bool? ?? false,
+  );
 }
 
 /// Represents a type parameter.
@@ -470,16 +506,17 @@ class TypeParameter {
 
   /// Bound of the type parameter (if any).
   final String? bound;
+  final Type? boundRef;
 
-  const TypeParameter({required this.name, this.bound});
+  const TypeParameter({required this.name, this.bound, this.boundRef});
 
-  Map<String, dynamic> toJson() {
-    return {'name': name, if (bound != null) 'bound': bound};
-  }
+  Map<String, dynamic> toJson() => {'name': name, if (bound != null) 'bound': bound, if (boundRef != null) 'boundRef': boundRef!.toJson()};
 
-  factory TypeParameter.fromJson(Map<String, dynamic> json) {
-    return TypeParameter(name: json['name'] as String, bound: json['bound'] as String?);
-  }
+  factory TypeParameter.fromJson(Map<String, dynamic> json) => TypeParameter(
+    name: json['name'] as String,
+    bound: json['bound'] as String?,
+    boundRef: json['boundRef'] == null ? null : Type.fromJson(json['boundRef'] as Map<String, dynamic>),
+  );
 }
 
 /// Represents a function or method parameter.
@@ -489,6 +526,7 @@ class Parameter {
 
   /// Type of the parameter.
   final String type;
+  final Type? typeRef;
 
   /// Whether the parameter is optional.
   final bool isOptional;
@@ -509,29 +547,28 @@ class Parameter {
     required this.isNamed,
     required this.hasDefaultValue,
     this.isRequired,
+    this.typeRef,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'type': type,
-      'isOptional': isOptional,
-      'isNamed': isNamed,
-      'hasDefaultValue': hasDefaultValue,
-      if (isRequired != null) 'isRequired': isRequired,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'type': type,
+    'isOptional': isOptional,
+    'isNamed': isNamed,
+    'hasDefaultValue': hasDefaultValue,
+    if (isRequired != null) 'isRequired': isRequired,
+    if (typeRef != null) 'typeRef': typeRef!.toJson(),
+  };
 
-  factory Parameter.fromJson(Map<String, dynamic> json) {
-    return Parameter(
-      name: json['name'] as String,
-      type: json['type'] as String,
-      isOptional: json['isOptional'] as bool? ?? false,
-      isNamed: json['isNamed'] as bool? ?? false,
-      hasDefaultValue: json['hasDefaultValue'] as bool? ?? false,
-      isRequired: json['isRequired'] as bool?,
-    );
-  }
+  factory Parameter.fromJson(Map<String, dynamic> json) => Parameter(
+    name: json['name'] as String,
+    type: json['type'] as String,
+    isOptional: json['isOptional'] as bool? ?? false,
+    isNamed: json['isNamed'] as bool? ?? false,
+    hasDefaultValue: json['hasDefaultValue'] as bool? ?? false,
+    isRequired: json['isRequired'] as bool?,
+    typeRef: json['typeRef'] == null ? null : Type.fromJson(json['typeRef'] as Map<String, dynamic>),
+  );
 }
 
 /// Represents an enum value.
@@ -544,13 +581,112 @@ class EnumValue {
 
   const EnumValue({required this.name, this.documentation});
 
-  Map<String, dynamic> toJson() {
-    return {'name': name, if (documentation != null) 'documentation': documentation};
+  Map<String, dynamic> toJson() => {'name': name, if (documentation != null) 'documentation': documentation};
+
+  factory EnumValue.fromJson(Map<String, dynamic> json) =>
+      EnumValue(name: json['name'] as String, documentation: json['documentation'] as String?);
+}
+
+sealed class Type {
+  Type({required this.name, this.libraryUri, this.isNullable = false, required this.kind});
+
+  factory Type.fromJson(Map<String, dynamic> json) {
+    final kind = json['kind'] as String;
+    return switch (kind) {
+      'class' => ClassType.fromJson(json),
+      'function' => FunctionType.fromJson(json),
+      'generic' => GenericType.fromJson(json),
+      'dynamic' => DynamicType.fromJson(json),
+      'void' => VoidType.fromJson(json),
+      _ => throw ArgumentError('Unknown type kind: $kind'),
+    };
   }
 
-  factory EnumValue.fromJson(Map<String, dynamic> json) {
-    return EnumValue(name: json['name'] as String, documentation: json['documentation'] as String?);
-  }
+  final String name;
+  final String? libraryUri;
+  final bool isNullable;
+  final String kind;
+
+  Map<String, dynamic> toJson();
+}
+
+class ClassType extends Type {
+  ClassType({required super.name, super.libraryUri, super.isNullable, this.arguments}) : super(kind: 'class');
+
+  factory ClassType.fromJson(Map<String, dynamic> json) => ClassType(
+    name: json['name'] as String,
+    libraryUri: json['libraryUri'] as String?,
+    isNullable: json['isNullable'] as bool? ?? false,
+    arguments: (json['arguments'] as List?)?.map((a) => Type.fromJson(a as Map<String, dynamic>)).toList(),
+  );
+
+  final List<Type>? arguments;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'libraryUri': libraryUri,
+    'isNullable': isNullable,
+    'kind': kind,
+    if (arguments != null && arguments!.isNotEmpty) 'arguments': arguments!.map((a) => a.toJson()).toList(),
+  };
+}
+
+class FunctionType extends Type {
+  FunctionType({super.libraryUri, super.isNullable, this.returnType, this.parameters}) : super(name: "Function", kind: 'function');
+
+  factory FunctionType.fromJson(Map<String, dynamic> json) => FunctionType(
+    libraryUri: json['libraryUri'] as String?,
+    isNullable: json['isNullable'] as bool? ?? false,
+    returnType: json['returnType'] == null ? null : Type.fromJson(json['returnType'] as Map<String, dynamic>),
+    parameters: (json['parameters'] as List?)?.map((p) => Parameter.fromJson(p as Map<String, dynamic>)).toList(),
+  );
+
+  final Type? returnType;
+  final List<Parameter>? parameters;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'libraryUri': libraryUri,
+    'isNullable': isNullable,
+    'kind': kind,
+    if (returnType != null) 'returnType': returnType!.toJson(),
+    if (parameters != null && parameters!.isNotEmpty) 'parameters': parameters!.map((p) => p.toJson()).toList(),
+  };
+}
+
+class GenericType extends Type {
+  GenericType({required super.name, super.isNullable, this.bound}) : super(kind: 'generic', libraryUri: null);
+
+  factory GenericType.fromJson(Map<String, dynamic> json) => GenericType(
+    name: json['name'] as String,
+    isNullable: json['isNullable'] as bool? ?? false,
+    bound: json['bound'] == null ? null : Type.fromJson(json['bound'] as Map<String, dynamic>),
+  );
+
+  final Type? bound;
+
+  @override
+  Map<String, dynamic> toJson() => {'name': name, 'isNullable': isNullable, 'kind': kind, if (bound != null) 'bound': bound!.toJson()};
+}
+
+class DynamicType extends Type {
+  DynamicType() : super(name: 'dynamic', kind: 'dynamic');
+
+  @override
+  Map<String, dynamic> toJson() => {'name': name, 'kind': kind};
+
+  factory DynamicType.fromJson(Map<String, dynamic> json) => DynamicType();
+}
+
+class VoidType extends Type {
+  VoidType() : super(name: 'void', kind: 'void');
+
+  @override
+  Map<String, dynamic> toJson() => {'name': name, 'kind': kind};
+
+  factory VoidType.fromJson(Map<String, dynamic> json) => VoidType();
 }
 
 /// Represents the analysis result for a package.
@@ -560,11 +696,8 @@ class PackageAnalysisResult {
 
   const PackageAnalysisResult({required this.elements});
 
-  Map<String, dynamic> toJson() {
-    return {'elements': elements.map((e) => e.toJson()).toList()};
-  }
+  Map<String, dynamic> toJson() => {'elements': elements.map((e) => e.toJson()).toList()};
 
-  factory PackageAnalysisResult.fromJson(Map<String, dynamic> json) {
-    return PackageAnalysisResult(elements: (json['elements'] as List).map((e) => ApiElement.fromJson(e as Map<String, dynamic>)).toList());
-  }
+  factory PackageAnalysisResult.fromJson(Map<String, dynamic> json) =>
+      PackageAnalysisResult(elements: (json['elements'] as List).map((e) => ApiElement.fromJson(e as Map<String, dynamic>)).toList());
 }
