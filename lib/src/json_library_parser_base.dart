@@ -844,6 +844,9 @@ class PackageApiAnalyzer {
   String? _tryFindImportingLibraryUri(DartType type) {
     final element = type.element;
     final name = element?.name;
+    final originalUri = type.element?.library?.uri.toString();
+    if (originalUri?.startsWith('dart:') == true || originalUri?.startsWith('package:flutter/') == true) return null;
+
     if (element == null || name == null) return type.element?.library?.uri.toString();
 
     for (final library in publicLibraries) {
