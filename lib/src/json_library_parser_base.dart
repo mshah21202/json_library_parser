@@ -763,8 +763,19 @@ class PackageApiAnalyzer {
       'isOptional': parameter.isOptional,
       'isNamed': parameter.isNamed,
       'hasDefaultValue': parameter.hasDefaultValue,
+      'defaultValueCode': _extractParameterDefaultValue(parameter),
       'isRequired': parameter.isRequired,
     };
+  }
+
+  String? _extractParameterDefaultValue(FormalParameterElement parameter) {
+    if (parameter.hasDefaultValue) {
+      final defaultValueCode = parameter.defaultValueCode;
+      if (defaultValueCode != null && defaultValueCode.isNotEmpty) {
+        return defaultValueCode;
+      }
+    }
+    return null;
   }
 
   /// Formats a DartType into a string representation with type arguments.
