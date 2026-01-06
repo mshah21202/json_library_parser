@@ -37,6 +37,7 @@ sealed class ApiElement {
       'enum' => EnumElement.fromJson(json),
       'function' => FunctionElement.fromJson(json),
       'variable' => VariableElement.fromJson(json),
+      'extension' => ExtensionElement.fromJson(json),
       _ => throw ArgumentError('Unknown element type: $elementType'),
     };
   }
@@ -591,6 +592,44 @@ class EnumValue {
 
   factory EnumValue.fromJson(Map<String, dynamic> json) =>
       EnumValue(name: json['name'] as String, documentation: json['documentation'] as String?);
+}
+
+class ExtensionElement extends ApiElement {
+  ExtensionElement({
+    required this.onType,
+    required this.onTypeRef,
+    required this.members,
+    required super.name,
+    required super.importableFrom,
+    required super.definedIn,
+    super.documentation,
+  }) : super(elementType: 'extension');
+
+  final String onType;
+  final Type onTypeRef;
+  final List<MemberElement> members;
+
+  factory ExtensionElement.fromJson(Map<String, dynamic> json) => ExtensionElement(
+    name: json['name'] as String,
+    importableFrom: (json['importableFrom'] as List).cast<String>(),
+    definedIn: json['definedIn'] as String,
+    documentation: json['documentation'] as String?,
+    onType: json['onType'] as String,
+    onTypeRef: Type.fromJson(json['onTypeRef'] as Map<String, dynamic>),
+    members: (json['members'] as List).map((m) => MemberElement.fromJson(m as Map<String, dynamic>)).toList(),
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'elementType': elementType,
+    if (documentation != null) 'documentation': documentation,
+    'onType': onType,
+    'onTypeRef': onTypeRef.toJson(),
+    'members': members.map((m) => m.toJson()).toList(),
+    'importableFrom': importableFrom,
+    'definedIn': definedIn,
+  };
 }
 
 sealed class Type {

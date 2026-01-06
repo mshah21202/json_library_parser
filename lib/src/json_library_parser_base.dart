@@ -137,6 +137,9 @@ class PackageApiAnalyzer {
         } else if (element is EnumElement) {
           elementData = _extractEnumApi(element);
           elementData['elementType'] = 'enum';
+        } else if (element is ExtensionElement) {
+          elementData = _extractExtensionApi(element);
+          elementData['elementType'] = 'extension';
         } else if (element is TopLevelVariableElement) {
           elementData = _extractTopLevelVariableApi(element);
           elementData['elementType'] = 'variable';
@@ -308,6 +311,34 @@ class PackageApiAnalyzer {
     }
 
     return chain;
+  }
+
+  Map<String, dynamic> _extractExtensionApi(ExtensionElement element) {
+    final extensionData = <String, dynamic>{'name': element.name};
+
+    // Add documentation if present
+    if (element.documentationComment != null) {
+      extensionData['documentation'] = element.documentationComment;
+    }
+
+    // Add extended type
+    extensionData['onType'] = _formatDartType(element.extendedType);
+    extensionData['onTypeRef'] = _extractDartTypeRef(element.extendedType).toJson();
+
+    // Extract members
+    final members = <Map<String, dynamic>>[];
+
+    for (final member in element.getters) {
+      members.add(_extractAccessorApi(member));
+    }
+
+    for (final member in element.methods) {
+      members.add(_extractMethodApi(member));
+    }
+
+    extensionData['members'] = members;
+
+    return extensionData;
   }
 
   /// Extracts the public API from a class element.
